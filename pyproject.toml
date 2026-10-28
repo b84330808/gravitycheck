@@ -10,6 +10,7 @@ requires-python = ">=3.11"
 dependencies = [
     "accelerate>=1.15.0",
     "av>=18.1.0",
+    "gradio>=6.31.0",
     "huggingface-hub>=2.3.0",
     "numpy>=2.4.6",
     "opencv-python>=5.0.0.93",

@@ -145,7 +145,7 @@ def gravity_clock(track: Track, size_m: tuple[float, float], arcs: list[Arc] | N
 
 
 def periodic_clock(name: str, times: np.ndarray, signal: np.ndarray, normal_hz: tuple[float, float],
-                   fmin: float = 0.1, fmax: float = 8.0, min_power: float = 0.3) -> Clock | None:
+                   fmin: float = 0.1, fmax: float = 8.0, min_power: float = 0.3, min_cycles: float = 3.0) -> Clock | None:
     """Read k from a rhythm with a known natural frequency range, e.g. walking cadence.
 
     Lomb-Scargle works on uneven timestamps, so variable frame rate needs no resampling.
@@ -160,7 +160,7 @@ def periodic_clock(name: str, times: np.ndarray, signal: np.ndarray, normal_hz: 
     power = lombscargle(t, s, 2 * np.pi * freqs)
     power = power / (np.sum(s**2) / 2 + 1e-12)  # fraction of variance at each frequency
     i = int(np.argmax(power))
-    if power[i] < min_power:
+    if power[i] < min_power or freqs[i] * span < min_cycles:  # one or two wiggles are not a rhythm
         return None
     f, df = freqs[i], 0.5 / span
     k = f / float(np.mean(normal_hz))
@@ -168,6 +168,16 @@ def periodic_clock(name: str, times: np.ndarray, signal: np.ndarray, normal_hz: 
                  {"freq_hz": float(f), "power": float(power[i]), "span_s": float(span)})
 
 
-def gait_clock(track: Track) -> Clock | None:
-    """Walking cadence from the vertical bob of a person's bounding box."""
+def gait_clock(track: Track, min_travel_widths: float = 1.0) -> Clock | None:
+    """Walking cadence from the vertical bob of a person's bounding box.
+
+    Only for someone actually walking: a person standing still still sways, and reading
+    that sway as a cadence produced a false alarm on a real classroom clip.
+    """
+    v = track.valid
+    if v.sum() < 12:
+        return None
+    travel = np.ptp(track.cx[v])
+    if travel < min_travel_widths * np.nanmedian(track.width[v]):
+        return None
     return periodic_clock("gait", track.times, track.cy, WALK_CADENCE_HZ)
